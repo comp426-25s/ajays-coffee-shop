@@ -5,8 +5,6 @@ import { createComponentClient } from "@/utils/supabase/clients/component";
 import { Coffee } from "@/utils/supabase/models/coffee";
 import { getCoffee } from "@/utils/supabase/queries/coffee";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
-import { toast } from "sonner";
 
 export default function HomePage() {
   const supabase = createComponentClient();
@@ -15,22 +13,6 @@ export default function HomePage() {
     queryKey: ["coffee"],
     queryFn: () => getCoffee(supabase),
   });
-
-  useEffect(() => {
-    const orderChannel = supabase
-      .channel("order-ready")
-      .on("broadcast", { event: "orderReadyAnnouncement" }, ({ payload }) => {
-        console.log(payload);
-        toast(`Order ${payload.message} is ready for pickup!`, {
-          description: "Please pick up your order at the counter.",
-        });
-      })
-      .subscribe();
-
-    return () => {
-      orderChannel.unsubscribe();
-    };
-  }, [supabase]);
 
   return (
     <div className="flex flex-col w-full p-6 gap-6">

@@ -2,17 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { createComponentClient } from "@/utils/supabase/clients/component";
 import { milkText } from "@/utils/supabase/models/coffee";
-import { NewOrder, NewOrderModel, Order } from "@/utils/supabase/models/order";
+import { Order } from "@/utils/supabase/models/order";
 import { getCoffee } from "@/utils/supabase/queries/coffee";
 import { fulfillOrder, getOrders } from "@/utils/supabase/queries/order";
-import { broadcastOrderReady } from "@/utils/supabase/realtime/broadcast";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Check, Megaphone } from "lucide-react";
-import { useCallback, useEffect } from "react";
 
 export default function CashierView() {
   const supabase = createComponentClient();
-  const reactQueryUtils = useQueryClient();
 
   const { data: coffee } = useQuery({
     queryKey: ["coffee"],
@@ -24,60 +21,11 @@ export default function CashierView() {
     queryFn: () => getOrders(supabase),
   });
 
-  const addOrderToCache = useCallback(
-    (newOrder: NewOrder) => {
-      reactQueryUtils.setQueryData(["orders"], (oldData: Order[]) => {
-        // Create order object to add
-        const coffeeItem = coffee?.find((c) => c.id === newOrder.coffee_id);
-        if (!coffeeItem) return oldData;
-
-        const order: Order = { ...newOrder, coffee: { name: coffeeItem.name } };
-        return [...oldData, order];
-      });
-    },
-    [coffee, reactQueryUtils]
-  );
-
-  const removeOrderFromCache = useCallback(
-    (order: Order) => {
-      reactQueryUtils.setQueryData(["orders"], (oldData: Order[]) => {
-        return oldData.filter((o) => o.id !== order.id);
-      });
-    },
-    [reactQueryUtils]
-  );
-
-  useEffect(() => {
-    const dbChangesChannel = supabase
-      .channel("table-db-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "order",
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            addOrderToCache(NewOrderModel.parse(payload.new));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      dbChangesChannel.unsubscribe();
-    };
-  }, [addOrderToCache, supabase]);
-
   const onFulfillOrder = async (order: Order) => {
     await fulfillOrder(supabase, order);
-    removeOrderFromCache(order);
   };
 
-  const onAnnounce = (order: Order) => {
-    broadcastOrderReady(supabase, order);
-  };
+  const onAnnounce = (order: Order) => {};
 
   return (
     <div className="flex flex-col w-full p-6 gap-6">
